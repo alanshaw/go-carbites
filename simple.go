@@ -20,7 +20,14 @@ func init() {
 	}
 }
 
-func splitSimple(ctx context.Context, r *car.CarReader, targetSize int, out chan io.Reader) error {
+// Split a CAR file and create multiple smaller CAR files using the "simple"
+// strategy.
+func SplitSimple(ctx context.Context, in io.Reader, targetSize int, out chan io.Reader) error {
+	defer close(out)
+	r, err := car.NewCarReader(in)
+	if err != nil {
+		return err
+	}
 	h := r.Header
 	done := false
 	for {

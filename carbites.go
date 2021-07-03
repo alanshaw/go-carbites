@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-
-	car "github.com/ipld/go-car"
 )
 
 // Strategy describes how CAR files should be split.
@@ -22,12 +20,12 @@ const (
 )
 
 // Split a CAR file and create multiple smaller CAR files.
-func Split(ctx context.Context, r *car.CarReader, targetSize int, s Strategy, out chan io.Reader) error {
+func Split(ctx context.Context, in io.Reader, targetSize int, s Strategy, out chan io.Reader) error {
 	switch s {
 	case Simple:
-		return splitSimple(ctx, r, targetSize, out)
+		return SplitSimple(ctx, in, targetSize, out)
 	case TreeWalk:
-		panic("not yet implemented")
+		return SplitTreewalk(ctx, in, targetSize, out)
 	default:
 		return fmt.Errorf("unknown strategy %d", s)
 	}

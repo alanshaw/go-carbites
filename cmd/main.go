@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/alanshaw/go-carbites"
-	"github.com/ipld/go-car"
 
 	cli "github.com/urfave/cli"
 )
@@ -30,11 +29,6 @@ var splitCmd = cli.Command{
 			return err
 		}
 		defer fi.Close()
-
-		cr, err := car.NewCarReader(bufio.NewReader(fi))
-		if err != nil {
-			return err
-		}
 
 		out := make(chan io.Reader)
 		dir := filepath.Dir(arg)
@@ -65,7 +59,12 @@ var splitCmd = cli.Command{
 			}
 		}()
 
-		err = carbites.Split(context.Background(), cr, c.Int("size"), carbites.Strategy(c.Int("strategy")), out)
+		var strategy carbites.Strategy
+		if c.String("strategy") == "treewalk" {
+			strategy = carbites.TreeWalk
+		}
+
+		err = carbites.Split(context.Background(), bufio.NewReader(fi), c.Int("size"), strategy, out)
 		if err != nil {
 			return err
 		}
@@ -74,8 +73,9 @@ var splitCmd = cli.Command{
 		return nil
 	},
 	Flags: []cli.Flag{
-		&cli.IntFlag{
+		&cli.StringFlag{
 			Name:  "strategy",
+			Value: "simple",
 			Usage: "Strategy for splitting CAR files \"simple\" or \"treewalk\" (default simple).",
 		},
 		&cli.IntFlag{
