@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -16,7 +17,7 @@ import (
 )
 
 var splitCmd = cli.Command{
-	Name: "header",
+	Name: "split",
 	Action: func(c *cli.Context) error {
 		if !c.Args().Present() {
 			return fmt.Errorf("must pass a CAR file to split")
@@ -59,7 +60,7 @@ var splitCmd = cli.Command{
 			}
 		}()
 
-		return carbites.Split(c, cr, c.Int("size"), c.Int("strategy"), out)
+		return carbites.Split(context.Background(), cr, c.Int("size"), carbites.Strategy(c.Int("strategy")), out)
 	},
 	Flags: []cli.Flag{
 		&cli.IntFlag{

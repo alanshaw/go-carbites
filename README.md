@@ -21,7 +21,7 @@ Carbites supports 2 different strategies:
 
 ### Simple
 
-⚠️ Note: The first CAR output has roots in the header, subsequent CARs have an empty root CID [`bafkqaaa`](https://cid.ipfs.io/#bafkqaaa) as [recommended](https://github.com/ipld/specs/blob/master/block-layer/content-addressable-archives.md#number-of-roots).
+The first CAR output has roots in the header, subsequent CARs have an empty root CID [`bafkqaaa`](https://cid.ipfs.io/#bafkqaaa) as [recommended](https://ipld.io/specs/transport/car/carv1/#number-of-roots).
 
 ### Treewalk
 
