@@ -70,4 +70,4 @@ Feel free to dive in! [Open an issue](https://github.com/alanshaw/go-carbites/is
 
 ## License
 
-Dual-licensed under [MIT](https://github.com/alanshaw/go-carbites/blob/main/LICENSE-MIT) + [Apache 2.0](https://github.com/alanshaw/go-carbites/blob/main/LICENSE-APACHE)
+Dual-licensed under [MIT + Apache 2.0](https://github.com/alanshaw/go-carbites/blob/main/LICENSE.md)
