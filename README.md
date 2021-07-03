@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/alanshaw/go-carbites/actions/workflows/main.yml/badge.svg)](https://github.com/alanshaw/go-carbites/actions/workflows/main.yml)
 [![Standard README](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg)](https://github.com/RichardLitt/standard-readme)
-[![Go Report Card](https://goreportcard.com/badge/github.com/alanshaw/multiwriter)](https://goreportcard.com/report/github.com/alanshaw/multiwriter)
+[![Go Report Card](https://goreportcard.com/badge/github.com/alanshaw/go-carbites)](https://goreportcard.com/report/github.com/alanshaw/go-carbites)
 
 Chunking for [CAR files](https://github.com/ipld/specs/blob/master/block-layer/content-addressable-archives.md). Split a single CAR into multiple CARs.
 
