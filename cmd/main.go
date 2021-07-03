@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/alanshaw/go-carbites"
 	"github.com/ipld/go-car"
@@ -39,7 +40,11 @@ var splitCmd = cli.Command{
 		dir := filepath.Dir(arg)
 		name := strings.TrimRight(filepath.Base(arg), ".car")
 
+		var wg sync.WaitGroup
+		wg.Add(1)
+
 		go func() {
+			defer wg.Done()
 			var i int
 			for {
 				select {
@@ -60,7 +65,13 @@ var splitCmd = cli.Command{
 			}
 		}()
 
-		return carbites.Split(context.Background(), cr, c.Int("size"), carbites.Strategy(c.Int("strategy")), out)
+		err = carbites.Split(context.Background(), cr, c.Int("size"), carbites.Strategy(c.Int("strategy")), out)
+		if err != nil {
+			return err
+		}
+
+		wg.Wait()
+		return nil
 	},
 	Flags: []cli.Flag{
 		&cli.IntFlag{
