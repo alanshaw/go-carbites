@@ -23,8 +23,8 @@ Carbites supports 2 different strategies:
 package main
 
 import (
+    "io"
 	"github.com/alanshaw/go-carbites"
-	"github.com/ipld/go-car"
 )
 
 func main() {
@@ -42,10 +42,10 @@ func main() {
         }
     }()
 
-    car, _ := car.NewCarReader(reader)
+    var reader io.Reader
     targetSize := 1000 // 1kb chunks
     strategy := carbites.Simple // also carbites.Treewalk
-    err := carbites.Split(context.Background(), car, targetSize, strategy, out)
+    err := carbites.Split(context.Background(), reader, targetSize, strategy, out)
 }
 
 ```
