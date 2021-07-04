@@ -130,3 +130,10 @@ func newCar(root cid.Cid, parents []blocks.Block) (*bytes.Buffer, error) {
 	}
 	return buf, nil
 }
+
+// Join together multiple CAR files into a single CAR file using the "treewalk"
+// strategy. Note that binary equality between the original CAR and the joined
+// CAR is not guaranteed.
+func JoinTreewalk(in []io.Reader) (io.Reader, error) {
+	return NewCarMerger(in)
+}

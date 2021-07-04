@@ -119,7 +119,7 @@ var joinCmd = &cli.Command{
 			strategy = carbites.Treewalk
 		}
 
-		out, err := carbites.Join(c.Context, in, strategy)
+		out, err := carbites.Join(in, strategy)
 		if err != nil {
 			return err
 		}
