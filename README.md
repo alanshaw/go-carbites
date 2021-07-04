@@ -44,7 +44,7 @@ func main() {
 
     car, _ := car.NewCarReader(reader)
     targetSize := 1000 // 1kb chunks
-    strategy := carbites.Simple // also carbites.TreeWalk
+    strategy := carbites.Simple // also carbites.Treewalk
     err := carbites.Split(context.Background(), car, targetSize, strategy, out)
 }
 
