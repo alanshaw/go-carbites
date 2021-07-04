@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -21,17 +20,11 @@ var splitCmd = &cli.Command{
 		if !c.Args().Present() {
 			return fmt.Errorf("must pass a CAR file to split")
 		}
-		arg := c.Args().First()
-
-		fi, err := os.Open(arg)
-		if err != nil {
-			return err
-		}
-		defer fi.Close()
+		path := c.Args().First()
 
 		out := make(chan io.Reader)
-		dir := filepath.Dir(arg)
-		name := strings.TrimRight(filepath.Base(arg), ".car")
+		dir := filepath.Dir(path)
+		name := strings.TrimRight(filepath.Base(path), ".car")
 
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -45,7 +38,9 @@ var splitCmd = &cli.Command{
 					if !ok {
 						return
 					}
-					fi, err := os.Create(fmt.Sprintf("%s/%s-%d.car", dir, name, i))
+					path := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
+					fmt.Printf("Writing CAR chunk to %s\n", path)
+					fi, err := os.Create(path)
 					if err != nil {
 						panic(err)
 					}
@@ -59,12 +54,26 @@ var splitCmd = &cli.Command{
 
 		var strategy carbites.Strategy
 		if c.String("strategy") == "treewalk" {
-			strategy = carbites.TreeWalk
+			strategy = carbites.Treewalk
 		}
+		size := c.Int("size")
+		fmt.Printf("Splitting into ~%d byte chunks using strategy \"%s\"\n", size, c.String("strategy"))
 
-		err = carbites.Split(context.Background(), bufio.NewReader(fi), c.Int("size"), strategy, out)
-		if err != nil {
-			return err
+		if strategy == carbites.Treewalk {
+			err := carbites.SplitTreewalkFromPath(c.Context, path, size, out)
+			if err != nil {
+				return err
+			}
+		} else {
+			fi, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer fi.Close()
+			err = carbites.Split(c.Context, bufio.NewReader(fi), size, strategy, out)
+			if err != nil {
+				return err
+			}
 		}
 
 		wg.Wait()
@@ -107,10 +116,10 @@ var joinCmd = &cli.Command{
 
 		var strategy carbites.Strategy
 		if c.String("strategy") == "treewalk" {
-			strategy = carbites.TreeWalk
+			strategy = carbites.Treewalk
 		}
 
-		out, err := carbites.Join(context.Background(), in, strategy)
+		out, err := carbites.Join(c.Context, in, strategy)
 		if err != nil {
 			return err
 		}

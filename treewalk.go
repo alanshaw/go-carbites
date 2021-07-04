@@ -15,6 +15,7 @@ import (
 	dag "github.com/ipfs/go-merkledag"
 	car "github.com/ipld/go-car"
 	util "github.com/ipld/go-car/util"
+	"github.com/willscott/carbs"
 )
 
 func init() {
@@ -27,7 +28,9 @@ type CarBlockReader interface {
 }
 
 // Split a CAR file and create multiple smaller CAR files using the "treewalk"
-// strategy.
+// strategy. Note: the entire CAR will be cached in memory. Use
+// SplitTreewalkFromPath or SplitTreewalkFromBlockReader for non-memory bound
+// splitting.
 func SplitTreewalk(ctx context.Context, r io.Reader, targetSize int, out chan io.Reader) error {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	h, err := car.LoadCar(bs, r)
@@ -37,13 +40,30 @@ func SplitTreewalk(ctx context.Context, r io.Reader, targetSize int, out chan io
 	if len(h.Roots) != 1 {
 		return fmt.Errorf("unexpected number of roots: %d", len(h.Roots))
 	}
-	return SplitTreewalkWithBlockReader(ctx, h.Roots[0], bs, targetSize, out)
+	return SplitTreewalkFromBlockReader(ctx, h.Roots[0], bs, targetSize, out)
 }
 
-// Split a CAR file and create multiple smaller CAR files using the "treewalk"
-// strategy and passing in the root CID of the CAR and a block reader
-// populated with the blocks from the CAR.
-func SplitTreewalkWithBlockReader(ctx context.Context, root cid.Cid, br CarBlockReader, targetSize int, out chan io.Reader) error {
+// Split a CAR file found on disk at the given path and create multiple smaller
+// CAR files using the "treewalk" strategy.
+func SplitTreewalkFromPath(ctx context.Context, path string, targetSize int, out chan io.Reader) error {
+	br, err := carbs.Load(path, false)
+	if err != nil {
+		return err
+	}
+	roots, err := br.Roots()
+	if err != nil {
+		return err
+	}
+	if len(roots) != 1 {
+		return fmt.Errorf("unexpected number of roots: %d", len(roots))
+	}
+	return SplitTreewalkFromBlockReader(ctx, roots[0], br, targetSize, out)
+}
+
+// Split a CAR file (passed as a root CID and a block reader populated with the
+// blocks from the CAR) and create multiple smaller CAR files using the
+// "treewalk" strategy.
+func SplitTreewalkFromBlockReader(ctx context.Context, root cid.Cid, br CarBlockReader, targetSize int, out chan io.Reader) error {
 	defer close(out)
 	b, err := addBlock(ctx, root, br, targetSize, nil, nil, out)
 	if err != nil {
