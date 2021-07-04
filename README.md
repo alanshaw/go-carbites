@@ -23,29 +23,26 @@ Carbites supports 2 different strategies:
 package main
 
 import (
-    "io"
+	"io"
 	"github.com/alanshaw/go-carbites"
 )
 
 func main() {
-    out := make(chan io.Reader)
+	out := make(chan io.Reader)
 
-    go func() {
-        var i int
-        for {
-            select {
-            case r := <-out:
-                b, _ := ioutil.ReadAll(r)
-                ioutil.WriteFile(fmt.Sprintf("chunk-%d.car", i), b, 0644)
-                i++
-            }
-        }
-    }()
+	go func() {
+		var i int
+		for r := range out {
+			b, _ := ioutil.ReadAll(r)
+			ioutil.WriteFile(fmt.Sprintf("chunk-%d.car", i), b, 0644)
+			i++
+		}
+	}()
 
-    var reader io.Reader
-    targetSize := 1000 // 1kb chunks
-    strategy := carbites.Simple // also carbites.Treewalk
-    err := carbites.Split(context.Background(), reader, targetSize, strategy, out)
+	var reader io.Reader
+	targetSize := 1000 // 1kb chunks
+	strategy := carbites.Simple // also carbites.Treewalk
+	err := carbites.Split(context.Background(), reader, targetSize, strategy, out)
 }
 
 ```

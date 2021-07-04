@@ -32,23 +32,17 @@ var splitCmd = &cli.Command{
 		go func() {
 			defer wg.Done()
 			var i int
-			for {
-				select {
-				case r, ok := <-out:
-					if !ok {
-						return
-					}
-					path := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
-					fmt.Printf("Writing CAR chunk to %s\n", path)
-					fi, err := os.Create(path)
-					if err != nil {
-						panic(err)
-					}
-					defer fi.Close()
-					br := bufio.NewReader(r)
-					br.WriteTo(fi)
-					i++
+			for r := range out {
+				path := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
+				fmt.Printf("Writing CAR chunk to %s\n", path)
+				fi, err := os.Create(path)
+				if err != nil {
+					panic(err)
 				}
+				br := bufio.NewReader(r)
+				br.WriteTo(fi)
+				fi.Close()
+				i++
 			}
 		}()
 
