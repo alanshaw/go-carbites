@@ -51,6 +51,10 @@ func main() {
 
 [pkg.go.dev Reference](https://pkg.go.dev/github.com/alanshaw/go-carbites)
 
+## Related
+
+* [Carbites in Javascript](https://github.com/nftstorage/carbites)
+
 ## Contribute
 
 Feel free to dive in! [Open an issue](https://github.com/alanshaw/go-carbites/issues/new) or submit PRs.
