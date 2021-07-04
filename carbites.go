@@ -30,3 +30,15 @@ func Split(ctx context.Context, in io.Reader, targetSize int, s Strategy, out ch
 		return fmt.Errorf("unknown strategy %d", s)
 	}
 }
+
+// Join together multiple CAR files into a single CAR file.
+func Join(ctx context.Context, in []io.Reader, s Strategy) (io.Reader, error) {
+	switch s {
+	case Simple:
+		return JoinSimple(in)
+	case TreeWalk:
+		return nil, fmt.Errorf("not implemented")
+	default:
+		return nil, fmt.Errorf("unknown strategy %d", s)
+	}
+}

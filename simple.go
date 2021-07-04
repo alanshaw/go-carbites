@@ -1,6 +1,7 @@
 package carbites
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"io"
@@ -72,4 +73,23 @@ func readChunk(ctx context.Context, h *car.CarHeader, carReader *car.CarReader, 
 		}
 	}
 	return buf, nil
+}
+
+// Join together multiple CAR files that were split using the "simple" strategy
+// into a single CAR file.
+func JoinSimple(in []io.Reader) (io.Reader, error) {
+	var brs []io.Reader
+	for i, r := range in {
+		br := bufio.NewReader(r)
+		brs = append(brs, br)
+		if i == 0 {
+			continue
+		}
+		// discard header from other CARs
+		_, err := util.LdRead(br)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return io.MultiReader(brs...), nil
 }

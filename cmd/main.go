@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,10 +12,10 @@ import (
 
 	"github.com/alanshaw/go-carbites"
 
-	cli "github.com/urfave/cli"
+	cli "github.com/urfave/cli/v2"
 )
 
-var splitCmd = cli.Command{
+var splitCmd = &cli.Command{
 	Name: "split",
 	Action: func(c *cli.Context) error {
 		if !c.Args().Present() {
@@ -46,14 +45,13 @@ var splitCmd = cli.Command{
 					if !ok {
 						return
 					}
-					b, err := ioutil.ReadAll(r)
+					fi, err := os.Create(fmt.Sprintf("%s/%s-%d.car", dir, name, i))
 					if err != nil {
-						panic(fmt.Errorf("reading chunk: %w", err))
+						panic(err)
 					}
-					err = ioutil.WriteFile(fmt.Sprintf("%s/%s-%d.car", dir, name, i), b, 0644)
-					if err != nil {
-						panic(fmt.Errorf("writing chunk: %w", err))
-					}
+					defer fi.Close()
+					br := bufio.NewReader(r)
+					br.WriteTo(fi)
 					i++
 				}
 			}
@@ -74,22 +72,82 @@ var splitCmd = cli.Command{
 	},
 	Flags: []cli.Flag{
 		&cli.StringFlag{
-			Name:  "strategy",
-			Value: "simple",
-			Usage: "Strategy for splitting CAR files \"simple\" or \"treewalk\" (default simple).",
+			Name:    "strategy",
+			Aliases: []string{"t"},
+			Value:   "simple",
+			Usage:   "Strategy for splitting CAR files \"simple\" or \"treewalk\".",
 		},
 		&cli.IntFlag{
-			Name:  "size",
-			Value: 1000,
-			Usage: "Target size in bytes to chunk CARs to (default 1KB)",
+			Name:    "size",
+			Aliases: []string{"s"},
+			Value:   1024 * 1024,
+			Usage:   "Target size in bytes to chunk CARs to.",
+		},
+	},
+}
+
+var joinCmd = &cli.Command{
+	Name: "join",
+	Action: func(c *cli.Context) error {
+		if !c.Args().Present() {
+			return fmt.Errorf("must pass CAR files to join")
+		}
+		paths := c.Args()
+
+		var in []io.Reader
+
+		for _, p := range paths.Slice() {
+			fi, err := os.Open(p)
+			if err != nil {
+				return err
+			}
+			defer fi.Close()
+			in = append(in, bufio.NewReader(fi))
+		}
+
+		var strategy carbites.Strategy
+		if c.String("strategy") == "treewalk" {
+			strategy = carbites.TreeWalk
+		}
+
+		out, err := carbites.Join(context.Background(), in, strategy)
+		if err != nil {
+			return err
+		}
+
+		fi, err := os.Create(c.String("output"))
+		if err != nil {
+			return err
+		}
+		defer fi.Close()
+		br := bufio.NewReader(out)
+		br.WriteTo(fi)
+
+		return nil
+	},
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:    "strategy",
+			Aliases: []string{"t"},
+			Value:   "simple",
+			Usage:   "Strategy for splitting CAR files \"simple\" or \"treewalk\".",
+		},
+		&cli.StringFlag{
+			Name:     "output",
+			Aliases:  []string{"o"},
+			Required: true,
+			Usage:    "Output path for joined CAR.",
 		},
 	},
 }
 
 func main() {
 	app := cli.NewApp()
-	app.Commands = []cli.Command{
+	app.Name = "carbites"
+	app.Usage = "Chunking for CAR files. Split a single CAR into multiple CARs."
+	app.Commands = []*cli.Command{
 		splitCmd,
+		joinCmd,
 	}
 	app.Run(os.Args)
 }
