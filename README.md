@@ -45,7 +45,6 @@ func main() {
 	strategy := carbites.Simple // also carbites.Treewalk
 	err := carbites.Split(context.Background(), bigCar, targetSize, strategy, out)
 }
-
 ```
 
 ## API
