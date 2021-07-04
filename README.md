@@ -24,6 +24,7 @@ package main
 
 import (
 	"io"
+	"os"
 	"github.com/alanshaw/go-carbites"
 )
 
@@ -39,10 +40,10 @@ func main() {
 		}
 	}()
 
-	var reader io.Reader
-	targetSize := 1000 // 1kb chunks
+	bigCar, _ := os.Open("big.car")
+	targetSize := 1024 * 1024 // 1MiB chunks
 	strategy := carbites.Simple // also carbites.Treewalk
-	err := carbites.Split(context.Background(), reader, targetSize, strategy, out)
+	err := carbites.Split(context.Background(), bigCar, targetSize, strategy, out)
 }
 
 ```

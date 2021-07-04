@@ -64,7 +64,7 @@ var splitCmd = &cli.Command{
 				return err
 			}
 			defer fi.Close()
-			err = carbites.Split(c.Context, bufio.NewReader(fi), size, strategy, out)
+			err = carbites.Split(c.Context, fi, size, strategy, out)
 			if err != nil {
 				return err
 			}
