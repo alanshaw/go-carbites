@@ -17,7 +17,7 @@ go get github.com/alanshaw/go-carbites
 Carbites supports 2 different strategies:
 
 1. **Simple** (default) - fast but naive, only the first CAR output has a root CID, subsequent CARs have a placeholder "empty" CID. The first CAR output has roots in the header, subsequent CARs have an empty root CID [`bafkqaaa`](https://cid.ipfs.io/#bafkqaaa) as [recommended](https://ipld.io/specs/transport/car/carv1/#number-of-roots).
-2. **Treewalk** - walks the DAG to pack sub-graphs into each CAR file that is output. Every CAR has the same root CID, but contains a different portion of the DAG. Every CAR file has the _same_ root CID but a different portion of the DAG. The DAG is traversed from the root node and each block is decoded and links extracted in order to determine which sub-graph to include in each CAR.
+2. **Treewalk** - walks the DAG to pack sub-graphs into each CAR file that is output. Every CAR file has the _same_ root CID but contains a different portion of the DAG. The DAG is traversed from the root node and each block is decoded and links extracted in order to determine which sub-graph to include in each CAR.
 
 ```go
 package main
