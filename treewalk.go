@@ -38,8 +38,8 @@ type TreewalkSplitter struct {
 
 // Split a CAR file and create multiple smaller CAR files using the "treewalk"
 // strategy. Note: the entire CAR will be cached in memory. Use
-// SplitTreewalkFromPath or SplitTreewalkFromBlockReader for non-memory bound
-// splitting.
+// NewTreewalkSplitterFromPath or NewTreewalkSplitterFromBlockReader for
+// non-memory bound splitting.
 func NewTreewalkSplitter(r io.Reader, targetSize int) (*TreewalkSplitter, error) {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	h, err := car.LoadCar(bs, r)
