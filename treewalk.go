@@ -126,9 +126,8 @@ func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
 			return nil, err
 		}
 
-		parents := append(st.parents, b)
-
 		if len(links) > 0 {
+			parents := append(st.parents, b)
 			pbs := []*pendingBlock{}
 			for _, link := range links {
 				pbs = append(pbs, &pendingBlock{parents, link.Cid})
@@ -137,7 +136,7 @@ func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
 		}
 
 		if readyCar != nil {
-			spltr.wcar, err = newCar(spltr.root, parents)
+			spltr.wcar, err = newCar(spltr.root, st.parents)
 			if err != nil {
 				return nil, err
 			}
