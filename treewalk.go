@@ -110,15 +110,15 @@ func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
 			}
 			break // done
 		}
-		st := spltr.pbs[0]
+		pb := spltr.pbs[0]
 		spltr.pbs = spltr.pbs[1:]
 
-		b, err := spltr.br.Get(st.cid)
+		b, err := spltr.br.Get(pb.cid)
 		if err != nil {
 			return nil, err
 		}
 		if b == nil {
-			return nil, fmt.Errorf("missing block for CID: %s", st.cid)
+			return nil, fmt.Errorf("missing block for CID: %s", pb.cid)
 		}
 
 		readyCar, links, err := spltr.addBlock(b, spltr.wcar)
@@ -126,8 +126,10 @@ func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
 			return nil, err
 		}
 
+		parents := pb.parents
+
 		if len(links) > 0 {
-			parents := append(st.parents, b)
+			parents = append(parents, b)
 			pbs := []*pendingBlock{}
 			for _, link := range links {
 				pbs = append(pbs, &pendingBlock{parents, link.Cid})
@@ -136,7 +138,7 @@ func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
 		}
 
 		if readyCar != nil {
-			spltr.wcar, err = newCar(spltr.root, st.parents)
+			spltr.wcar, err = newCar(spltr.root, parents)
 			if err != nil {
 				return nil, err
 			}

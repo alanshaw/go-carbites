@@ -8,6 +8,7 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	ipld "github.com/ipfs/go-ipld-format"
 	"github.com/ipld/go-car"
 )
 
@@ -100,6 +101,7 @@ func testSplitter(t *testing.T, ctor splitterCtor, targetSize int, expectedCars 
 
 	inf := newCarInfo(t, testCarPath)
 	var unqBlks []blocks.Block
+	var leafBlks []blocks.Block
 
 	for i, r := range srs {
 		car, err := car.NewCarReader(r)
@@ -123,6 +125,23 @@ func testSplitter(t *testing.T, ctor splitterCtor, targetSize int, expectedCars 
 			if !found {
 				unqBlks = append(unqBlks, cb)
 			}
+
+			nd, err := ipld.Decode(cb)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if len(nd.Links()) > 0 {
+				continue
+			}
+
+			// check if this leaf node was already included in another CAR
+			for _, lb := range leafBlks {
+				if lb.Cid() == cb.Cid() {
+					t.Fatal(fmt.Errorf("leaf node found in multiple CARs: %s", cb.Cid()))
+				}
+			}
+			leafBlks = append(leafBlks, cb)
 		}
 	}
 
