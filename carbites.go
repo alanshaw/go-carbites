@@ -1,7 +1,6 @@
 package carbites
 
 import (
-	"context"
 	"fmt"
 	"io"
 )
@@ -19,15 +18,20 @@ const (
 	Treewalk
 )
 
+type Splitter interface {
+	// Next splits the next CAR file out from the input CAR file.
+	Next() (io.Reader, error)
+}
+
 // Split a CAR file and create multiple smaller CAR files.
-func Split(ctx context.Context, in io.Reader, targetSize int, s Strategy, out chan io.Reader) error {
+func Split(in io.Reader, targetSize int, s Strategy) (Splitter, error) {
 	switch s {
 	case Simple:
-		return SplitSimple(ctx, in, targetSize, out)
+		return NewSimpleSplitter(in, targetSize)
 	case Treewalk:
-		return SplitTreewalk(ctx, in, targetSize, out)
+		return NewTreewalkSplitter(in, targetSize)
 	default:
-		return fmt.Errorf("unknown strategy %d", s)
+		return nil, fmt.Errorf("unknown strategy %d", s)
 	}
 }
 

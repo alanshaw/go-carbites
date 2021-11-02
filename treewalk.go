@@ -2,7 +2,6 @@ package carbites
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 
@@ -11,6 +10,7 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	cbor "github.com/ipfs/go-ipld-cbor"
 	ipld "github.com/ipfs/go-ipld-format"
 	dag "github.com/ipfs/go-merkledag"
 	car "github.com/ipld/go-car"
@@ -21,95 +21,152 @@ import (
 func init() {
 	ipld.Register(cid.DagProtobuf, dag.DecodeProtobufBlock)
 	ipld.Register(cid.Raw, dag.DecodeRawBlock)
+	ipld.Register(cid.DagCBOR, cbor.DecodeBlock)
 }
 
-type CarBlockReader interface {
+type BlockReader interface {
 	Get(cid.Cid) (blocks.Block, error)
+}
+
+type TreewalkSplitter struct {
+	root       cid.Cid
+	wcar       *bytes.Buffer   // the current "working" CAR
+	pbs        []*pendingBlock // pending subtrees to add to the current CAR
+	br         BlockReader
+	targetSize int
 }
 
 // Split a CAR file and create multiple smaller CAR files using the "treewalk"
 // strategy. Note: the entire CAR will be cached in memory. Use
 // SplitTreewalkFromPath or SplitTreewalkFromBlockReader for non-memory bound
 // splitting.
-func SplitTreewalk(ctx context.Context, r io.Reader, targetSize int, out chan io.Reader) error {
+func NewTreewalkSplitter(r io.Reader, targetSize int) (*TreewalkSplitter, error) {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
 	h, err := car.LoadCar(bs, r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(h.Roots) != 1 {
-		return fmt.Errorf("unexpected number of roots: %d", len(h.Roots))
+		return nil, fmt.Errorf("unexpected number of roots: %d", len(h.Roots))
 	}
-	return SplitTreewalkFromBlockReader(ctx, h.Roots[0], bs, targetSize, out)
+	return NewTreewalkSplitterFromBlockReader(h.Roots[0], bs, targetSize)
 }
 
 // Split a CAR file found on disk at the given path and create multiple smaller
 // CAR files using the "treewalk" strategy.
-func SplitTreewalkFromPath(ctx context.Context, path string, targetSize int, out chan io.Reader) error {
+func NewTreewalkSplitterFromPath(path string, targetSize int) (*TreewalkSplitter, error) {
 	br, err := carbs.Load(path, false)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	roots, err := br.Roots()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(roots) != 1 {
-		return fmt.Errorf("unexpected number of roots: %d", len(roots))
+		return nil, fmt.Errorf("unexpected number of roots: %d", len(roots))
 	}
-	return SplitTreewalkFromBlockReader(ctx, roots[0], br, targetSize, out)
+	return NewTreewalkSplitterFromBlockReader(roots[0], br, targetSize)
 }
 
 // Split a CAR file (passed as a root CID and a block reader populated with the
 // blocks from the CAR) and create multiple smaller CAR files using the
 // "treewalk" strategy.
-func SplitTreewalkFromBlockReader(ctx context.Context, root cid.Cid, br CarBlockReader, targetSize int, out chan io.Reader) error {
-	defer close(out)
-	b, err := addBlock(ctx, root, br, targetSize, nil, nil, out)
+func NewTreewalkSplitterFromBlockReader(root cid.Cid, br BlockReader, targetSize int) (*TreewalkSplitter, error) {
+	b, err := br.Get(root)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case out <- b:
+	if b == nil {
+		return nil, fmt.Errorf("missing block for CID: %s", root)
 	}
-	return nil
+
+	parents := []blocks.Block{b}
+	wcar, err := newCar(root, parents)
+	if err != nil {
+		return nil, err
+	}
+
+	nd, err := ipld.Decode(b)
+	if err != nil {
+		return nil, err
+	}
+
+	pbs := []*pendingBlock{}
+	for _, link := range nd.Links() {
+		pbs = append(pbs, &pendingBlock{parents, link.Cid})
+	}
+
+	return &TreewalkSplitter{root, wcar, pbs, br, targetSize}, nil
 }
 
-func addBlock(ctx context.Context, c cid.Cid, br CarBlockReader, targetSize int, car *bytes.Buffer, parents []blocks.Block, out chan io.Reader) (*bytes.Buffer, error) {
-	blk, err := br.Get(c)
-	if err != nil {
-		return nil, err
-	}
-	if car == nil {
-		parents = []blocks.Block{}
-		car, err = newCar(c, parents)
+func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
+	for {
+		if len(spltr.pbs) == 0 {
+			if spltr.wcar != nil {
+				car := spltr.wcar
+				spltr.wcar = nil
+				return car, nil
+			}
+			break // done
+		}
+		st := spltr.pbs[0]
+		spltr.pbs = spltr.pbs[1:]
+
+		b, err := spltr.br.Get(st.cid)
 		if err != nil {
 			return nil, err
 		}
-	}
-	if car.Len() > 0 && car.Len()+len(blk.RawData()) > targetSize {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case out <- car:
+		if b == nil {
+			return nil, fmt.Errorf("missing block for CID: %s", st.cid)
 		}
-		car, err = newCar(parents[0].Cid(), parents)
-	}
-	parents = append(parents, blk)
-	err = util.LdWrite(car, blk.Cid().Bytes(), blk.RawData())
-	if err != nil {
-		return nil, err
-	}
-	nd, err := ipld.Decode(blk)
-	for _, link := range nd.Links() {
-		car, err = addBlock(ctx, link.Cid, br, targetSize, car, parents, out)
+
+		readyCar, links, err := spltr.addBlock(b, spltr.wcar)
 		if err != nil {
 			return nil, err
 		}
+
+		parents := append(st.parents, b)
+
+		if len(links) > 0 {
+			pbs := []*pendingBlock{}
+			for _, link := range links {
+				pbs = append(pbs, &pendingBlock{parents, link.Cid})
+			}
+			spltr.pbs = append(pbs, spltr.pbs...)
+		}
+
+		if readyCar != nil {
+			spltr.wcar, err = newCar(spltr.root, parents)
+			if err != nil {
+				return nil, err
+			}
+			return readyCar, nil
+		}
 	}
-	return car, nil
+
+	return nil, io.EOF
+}
+
+type pendingBlock struct {
+	parents []blocks.Block
+	cid     cid.Cid
+}
+
+func (spltr *TreewalkSplitter) addBlock(b blocks.Block, car *bytes.Buffer) (*bytes.Buffer, []*ipld.Link, error) {
+	var readyCar *bytes.Buffer
+	if car.Len() > 0 && car.Len()+len(b.RawData()) > spltr.targetSize {
+		readyCar = car
+	}
+	err := util.LdWrite(car, b.Cid().Bytes(), b.RawData())
+	if err != nil {
+		return nil, nil, err
+	}
+	nd, err := ipld.Decode(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	return readyCar, nd.Links(), nil
 }
 
 func newCar(root cid.Cid, parents []blocks.Block) (*bytes.Buffer, error) {
