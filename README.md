@@ -29,21 +29,24 @@ import (
 )
 
 func main() {
-	out := make(chan io.Reader)
-
-	go func() {
-		var i int
-		for r := range out {
-			b, _ := ioutil.ReadAll(r)
-			ioutil.WriteFile(fmt.Sprintf("chunk-%d.car", i), b, 0644)
-			i++
-		}
-	}()
-
 	bigCar, _ := os.Open("big.car")
 	targetSize := 1024 * 1024 // 1MiB chunks
 	strategy := carbites.Simple // also carbites.Treewalk
-	err := carbites.Split(context.Background(), bigCar, targetSize, strategy, out)
+	spltr, _ := carbites.Split(bigCar, targetSize, strategy)
+
+	var i int
+	for {
+		car, err := spltr.Next()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			panic(err)
+		}
+		b, _ := ioutil.ReadAll(car)
+		ioutil.WriteFile(fmt.Sprintf("chunk-%d.car", i), b, 0644)
+		i++
+	}
 }
 ```
 

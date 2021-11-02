@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/alanshaw/go-carbites"
 
@@ -21,30 +21,8 @@ var splitCmd = &cli.Command{
 			return fmt.Errorf("must pass a CAR file to split")
 		}
 		path := c.Args().First()
-
-		out := make(chan io.Reader)
 		dir := filepath.Dir(path)
 		name := strings.TrimRight(filepath.Base(path), ".car")
-
-		var wg sync.WaitGroup
-		wg.Add(1)
-
-		go func() {
-			defer wg.Done()
-			var i int
-			for r := range out {
-				path := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
-				fmt.Printf("Writing CAR chunk to %s\n", path)
-				fi, err := os.Create(path)
-				if err != nil {
-					panic(err)
-				}
-				br := bufio.NewReader(r)
-				br.WriteTo(fi)
-				fi.Close()
-				i++
-			}
-		}()
 
 		var strategy carbites.Strategy
 		if c.String("strategy") == "treewalk" {
@@ -53,24 +31,45 @@ var splitCmd = &cli.Command{
 		size := c.Int("size")
 		fmt.Printf("Splitting into ~%d byte chunks using strategy \"%s\"\n", size, c.String("strategy"))
 
+		var spltr carbites.Splitter
+		var err error
 		if strategy == carbites.Treewalk {
-			err := carbites.SplitTreewalkFromPath(c.Context, path, size, out)
-			if err != nil {
-				return err
-			}
+			// does not cache in memory
+			spltr, err = carbites.NewTreewalkSplitterFromPath(path, size)
 		} else {
-			fi, err := os.Open(path)
+			var fi fs.File
+			fi, err = os.Open(path)
 			if err != nil {
 				return err
 			}
 			defer fi.Close()
-			err = carbites.Split(c.Context, fi, size, strategy, out)
+			spltr, err = carbites.Split(fi, size, strategy)
+		}
+		if err != nil {
+			return err
+		}
+
+		var i int
+		for {
+			r, err := spltr.Next()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				return err
+			}
+			path := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
+			fmt.Printf("Writing CAR chunk to %s\n", path)
+			fi, err := os.Create(path)
 			if err != nil {
 				return err
 			}
+			br := bufio.NewReader(r)
+			br.WriteTo(fi)
+			fi.Close()
+			i++
 		}
 
-		wg.Wait()
 		return nil
 	},
 	Flags: []cli.Flag{

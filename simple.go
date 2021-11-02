@@ -3,7 +3,6 @@ package carbites
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"io"
 
 	"github.com/ipfs/go-cid"
@@ -21,56 +20,50 @@ func init() {
 	}
 }
 
-// Split a CAR file and create multiple smaller CAR files using the "simple"
-// strategy.
-func SplitSimple(ctx context.Context, in io.Reader, targetSize int, out chan io.Reader) error {
-	defer close(out)
-	r, err := car.NewCarReader(in)
-	if err != nil {
-		return err
-	}
-	h := r.Header
-	done := false
-	for {
-		r, err := readChunk(ctx, h, r, targetSize)
-		if err != nil {
-			if r != nil && err == io.EOF {
-				done = true
-			} else {
-				return err
-			}
-		}
-		h = emptyHd
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case out <- r:
-		}
-		if done {
-			break
-		}
-	}
-	return nil
+type SimpleSplitter struct {
+	reader     *car.CarReader
+	header     *car.CarHeader
+	targetSize int
 }
 
-func readChunk(ctx context.Context, h *car.CarHeader, carReader *car.CarReader, s int) (io.Reader, error) {
-	var b []byte
-	buf := bytes.NewBuffer(b)
-	err := car.WriteHeader(h, buf)
+// Create a new CAR file splitter to create multiple smaller CAR files using the
+// "simple" strategy.
+func NewSimpleSplitter(in io.Reader, targetSize int) (*SimpleSplitter, error) {
+	r, err := car.NewCarReader(in)
 	if err != nil {
 		return nil, err
 	}
+	h := r.Header
+	return &SimpleSplitter{r, h, targetSize}, nil
+}
+
+func (spltr *SimpleSplitter) Next() (io.Reader, error) {
+	var b []byte
+	buf := bytes.NewBuffer(b)
+	err := car.WriteHeader(spltr.header, buf)
+	if err != nil {
+		return nil, err
+	}
+	spltr.header = emptyHd
+	empty := true
 	total := buf.Len()
 	for {
-		bl, err := carReader.Next()
+		bl, err := spltr.reader.Next()
 		if err != nil {
-			return buf, err
+			if err == io.EOF {
+				break
+			}
+			return nil, err
 		}
+		empty = false
 		util.LdWrite(buf, bl.Cid().Bytes(), bl.RawData())
 		total += len(bl.RawData())
-		if total >= s {
+		if total >= spltr.targetSize {
 			break
 		}
+	}
+	if empty {
+		return nil, io.EOF
 	}
 	return buf, nil
 }
