@@ -16,7 +16,7 @@ import (
 	dag "github.com/ipfs/go-merkledag"
 	car "github.com/ipld/go-car"
 	util "github.com/ipld/go-car/util"
-	carBlockstore "github.com/ipld/go-car/v2/blockstore"
+	carbs "github.com/ipld/go-car/v2/blockstore"
 )
 
 func init() {
@@ -56,7 +56,7 @@ func NewTreewalkSplitter(r io.Reader, targetSize int) (*TreewalkSplitter, error)
 // Split a CAR file found on disk at the given path and create multiple smaller
 // CAR files using the "treewalk" strategy.
 func NewTreewalkSplitterFromPath(path string, targetSize int) (*TreewalkSplitter, error) {
-	br, err := carBlockstore.OpenReadOnly(path)
+	br, err := carbs.OpenReadOnly(path)
 	if err != nil {
 		return nil, err
 	}
