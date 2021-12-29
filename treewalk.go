@@ -2,6 +2,7 @@ package carbites
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 
@@ -15,7 +16,7 @@ import (
 	dag "github.com/ipfs/go-merkledag"
 	car "github.com/ipld/go-car"
 	util "github.com/ipld/go-car/util"
-	"github.com/willscott/carbs"
+	carBlockstore "github.com/ipld/go-car/v2/blockstore"
 )
 
 func init() {
@@ -25,7 +26,7 @@ func init() {
 }
 
 type BlockReader interface {
-	Get(cid.Cid) (blocks.Block, error)
+	Get(context.Context, cid.Cid) (blocks.Block, error)
 }
 
 type TreewalkSplitter struct {
@@ -42,7 +43,7 @@ type TreewalkSplitter struct {
 // non-memory bound splitting.
 func NewTreewalkSplitter(r io.Reader, targetSize int) (*TreewalkSplitter, error) {
 	bs := blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
-	h, err := car.LoadCar(bs, r)
+	h, err := car.LoadCar(context.Background(), bs, r)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +56,7 @@ func NewTreewalkSplitter(r io.Reader, targetSize int) (*TreewalkSplitter, error)
 // Split a CAR file found on disk at the given path and create multiple smaller
 // CAR files using the "treewalk" strategy.
 func NewTreewalkSplitterFromPath(path string, targetSize int) (*TreewalkSplitter, error) {
-	br, err := carbs.Load(path, false)
+	br, err := carBlockstore.OpenReadOnly(path)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +74,7 @@ func NewTreewalkSplitterFromPath(path string, targetSize int) (*TreewalkSplitter
 // blocks from the CAR) and create multiple smaller CAR files using the
 // "treewalk" strategy.
 func NewTreewalkSplitterFromBlockReader(root cid.Cid, br BlockReader, targetSize int) (*TreewalkSplitter, error) {
-	b, err := br.Get(root)
+	b, err := br.Get(context.Background(), root)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +114,7 @@ func (spltr *TreewalkSplitter) Next() (io.Reader, error) {
 		pb := spltr.pbs[0]
 		spltr.pbs = spltr.pbs[1:]
 
-		b, err := spltr.br.Get(pb.cid)
+		b, err := spltr.br.Get(context.Background(), pb.cid)
 		if err != nil {
 			return nil, err
 		}
