@@ -29,7 +29,7 @@ func Split(in io.Reader, targetSize int, s Strategy) (Splitter, error) {
 	case Simple:
 		return NewSimpleSplitter(in, targetSize)
 	case Treewalk:
-		return NewTreewalkSplitter(in, targetSize)
+		return nil, fmt.Errorf("treewalk strategy caches the entier CAR, which is not allowed due to memory considerations")
 	default:
 		return nil, fmt.Errorf("unknown strategy %d", s)
 	}

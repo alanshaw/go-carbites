@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,34 +16,39 @@ import (
 var splitCmd = &cli.Command{
 	Name: "split",
 	Action: func(c *cli.Context) error {
-		if !c.Args().Present() {
-			return fmt.Errorf("must pass a CAR file to split")
-		}
-		path := c.Args().First()
-		dir := filepath.Dir(path)
-		name := strings.TrimRight(filepath.Base(path), ".car")
-
 		var strategy carbites.Strategy
 		if c.String("strategy") == "treewalk" {
 			strategy = carbites.Treewalk
 		}
+
 		size := c.Int("size")
 		fmt.Printf("Splitting into ~%d byte chunks using strategy \"%s\"\n", size, c.String("strategy"))
 
-		var spltr carbites.Splitter
+		var path, dir, name string
+		var fi io.Reader
 		var err error
-		if strategy == carbites.Treewalk {
-			// does not cache in memory
-			spltr, err = carbites.NewTreewalkSplitterFromPath(path, size)
-		} else {
-			var fi fs.File
+
+		if c.Args().Present() {
+			path = c.Args().First()
+			dir = filepath.Dir(path)
+			name = strings.TrimRight(filepath.Base(path), ".car")
+
 			fi, err = os.Open(path)
 			if err != nil {
 				return err
 			}
-			defer fi.Close()
-			spltr, err = carbites.Split(fi, size, strategy)
+		} else {
+			if strategy == carbites.Treewalk {
+				return fmt.Errorf("treewalk strategy does not handle stdin, must pass a CAR file")
+			}
+
+			dir = "." // default to current directory
+			name = "stdin"
+
+			fi = bufio.NewReader(os.Stdin)
 		}
+
+		spltr, err := carbites.Split(fi, size, strategy)
 		if err != nil {
 			return err
 		}
@@ -58,15 +62,17 @@ var splitCmd = &cli.Command{
 				}
 				return err
 			}
-			path := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
-			fmt.Printf("Writing CAR chunk to %s\n", path)
-			fi, err := os.Create(path)
+			writePath := fmt.Sprintf("%s/%s-%d.car", dir, name, i)
+			fmt.Printf("Writing CAR chunk to %s\n", writePath)
+			fi, err := os.Create(writePath)
 			if err != nil {
 				return err
 			}
 			br := bufio.NewReader(r)
-			br.WriteTo(fi)
-			fi.Close()
+			_, err = br.WriteTo(fi)
+			if err != nil {
+				return err
+			}
 			i++
 		}
 
