@@ -151,5 +151,9 @@ func main() {
 		splitCmd,
 		joinCmd,
 	}
-	app.Run(os.Args)
+	err := app.Run(os.Args)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		return
+	}
 }
