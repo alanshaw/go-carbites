@@ -24,39 +24,38 @@ var splitCmd = &cli.Command{
 		size := c.Int("size")
 		fmt.Printf("Splitting into ~%d byte chunks using strategy \"%s\"\n", size, c.String("strategy"))
 
-		var path, dir, name string
-		var fi io.Reader
+		var dir, name string
+		var spltr carbites.Splitter
 		var err error
 
-		if c.Args().Present() {
-			path = c.Args().First()
+		if strategy == carbites.Treewalk {
+			if !c.Args().Present() {
+				return fmt.Errorf("treewalk strategy does not handle stdin, must pass a CAR file")
+			}
+			path := c.Args().First()
 			dir = filepath.Dir(path)
 			name = strings.TrimRight(filepath.Base(path), ".car")
 
-			fi, err = os.Open(path)
-			if err != nil {
-				return err
-			}
-		} else {
-			if strategy == carbites.Treewalk {
-				return fmt.Errorf("treewalk strategy does not handle stdin, must pass a CAR file")
-			}
-
-			dir = "." // default to current directory
-			name = "stdin"
-
-			fi = bufio.NewReader(os.Stdin)
-		}
-
-		var spltr carbites.Splitter
-
-		if strategy == carbites.Treewalk {
 			spltr, err = carbites.NewTreewalkSplitterFromPath(path, size)
 		} else {
+
+			var fi io.Reader
+			if !c.Args().Present() {
+				dir = "." // default to current directory
+				name = "stdin"
+
+				fi = bufio.NewReader(os.Stdin)
+			} else {
+				path := c.Args().First()
+				dir = filepath.Dir(path)
+				name = strings.TrimRight(filepath.Base(path), ".car")
+
+				fi, err = os.Open(path)
+				if err != nil {
+					return err
+				}
+			}
 			spltr, err = carbites.Split(fi, size, strategy)
-		}
-		if err != nil {
-			return err
 		}
 
 		var i int
