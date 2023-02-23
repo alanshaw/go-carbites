@@ -48,7 +48,13 @@ var splitCmd = &cli.Command{
 			fi = bufio.NewReader(os.Stdin)
 		}
 
-		spltr, err := carbites.Split(fi, size, strategy)
+		var spltr carbites.Splitter
+
+		if strategy == carbites.Treewalk {
+			spltr, err = carbites.NewTreewalkSplitterFromPath(path, size)
+		} else {
+			spltr, err = carbites.Split(fi, size, strategy)
+		}
 		if err != nil {
 			return err
 		}
