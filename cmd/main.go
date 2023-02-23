@@ -73,6 +73,7 @@ var splitCmd = &cli.Command{
 			if err != nil {
 				return err
 			}
+			fi.Close()
 			i++
 		}
 
