@@ -11,18 +11,24 @@ import (
 	ds "github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	cbor "github.com/ipfs/go-ipld-cbor"
 	ipld "github.com/ipfs/go-ipld-format"
+	legacy "github.com/ipfs/go-ipld-legacy"
 	dag "github.com/ipfs/go-merkledag"
 	car "github.com/ipld/go-car"
 	util "github.com/ipld/go-car/util"
 	carbs "github.com/ipld/go-car/v2/blockstore"
+	dagpb "github.com/ipld/go-codec-dagpb"
+	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 )
 
+// TODO: Temporary buildfix to use a global registry.
+var ipldLegacyDecoder *legacy.Decoder
+
 func init() {
-	ipld.Register(cid.DagProtobuf, dag.DecodeProtobufBlock)
-	ipld.Register(cid.Raw, dag.DecodeRawBlock)
-	ipld.Register(cid.DagCBOR, cbor.DecodeBlock)
+	d := legacy.NewDecoder()
+	d.RegisterCodec(cid.DagProtobuf, dagpb.Type.PBNode, dag.ProtoNodeConverter)
+	d.RegisterCodec(cid.Raw, basicnode.Prototype.Bytes, dag.RawNodeConverter)
+	ipldLegacyDecoder = d
 }
 
 type BlockReader interface {
@@ -88,7 +94,7 @@ func NewTreewalkSplitterFromBlockReader(root cid.Cid, br BlockReader, targetSize
 		return nil, err
 	}
 
-	nd, err := ipld.Decode(b)
+	nd, err := ipldLegacyDecoder.DecodeNode(context.Background(), b)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +170,7 @@ func (spltr *TreewalkSplitter) addBlock(b blocks.Block, car *bytes.Buffer) (*byt
 	if err != nil {
 		return nil, nil, err
 	}
-	nd, err := ipld.Decode(b)
+	nd, err := ipldLegacyDecoder.DecodeNode(context.Background(), b)
 	if err != nil {
 		return nil, nil, err
 	}
