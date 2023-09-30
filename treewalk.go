@@ -21,7 +21,7 @@ import (
 	basicnode "github.com/ipld/go-ipld-prime/node/basic"
 )
 
-// TODO: Temporary buildfix to use a global registry.
+// NOTE: Temporary buildfix to use a global registry.
 var ipldLegacyDecoder *legacy.Decoder
 
 func init() {
